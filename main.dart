@@ -1,4 +1,6 @@
 
+import 'dart:convert';
+
 import 'package:http/http.dart';
 import 'package:html/parser.dart' show parse;
 import 'package:html/dom.dart';
@@ -13,10 +15,22 @@ main(List<String> args) async {
   // printRegion(h4s[3]); // Kayah State
   // printRegion(h4s[4]); // Shan State
   // printRegion(h4s[14]); // Rakhine State
-  printAll(h4s);
+  // printCsv(h4s);
+  printJson(h4s);
+
 }
 
-printAll(List<Element> h4s) {
+printJson(List<Element> h4s) {
+  final regions = <String, Map<String, List<String>>>{};
+  h4s.forEach((reg) {
+    final region = reg.children[0].text;
+    regions[region] = processRegion(reg);
+  });
+
+  print(json.encode(regions));
+}
+
+printCsv(List<Element> h4s) {
   final list = <List<String>>[];
   h4s.forEach((reg) {
     final townships = procRegion(reg);
@@ -35,25 +49,47 @@ printRegion(Element reg) {
 }
 
 List<List<String>> procRegion(Element reg) {
-  final out = <List<String>>[];
   final region = reg.children[0].text;
-  print(region);
+  final out = processRegion(reg);
+  final list = <List<String>>[];
+
+  out.keys.forEach((district) {
+    out[district].forEach((tw) {
+      list.add([region, district, tw]);
+    });
+  });
+  return list;
+}
+
+Map<String, List<String>> processRegion(Element reg) {
+  final out = <String, List<String>>{};
+  final region = reg.children[0].text;
+  // print(region);
   var next = reg.nextElementSibling;
   while (next != null && next.localName != 'h4') {
     final tbody = next.querySelector('tbody');
     if (tbody != null) {
-      out.addAll(extractTownships(tbody));
+      out.addAll(extractTownship(tbody));
     }
     next = next.nextElementSibling;
   }
-  out.forEach((arr) {
-    arr.insert(0, region);
-  });
+
   return out;
 }
 
 List<List<String>> extractTownships(Element tbody) {
-  final out = <List<String>>[];
+  final out = extractTownship(tbody);
+  final list = <List<String>>[];
+  out.keys.forEach((district) {
+    out[district].forEach((tw) {
+      list.add([district, tw]);
+    });
+  });
+  return list;
+}
+
+Map<String, List<String>> extractTownship(Element tbody) {
+  final out = <String, List<String>>{};
   tbody.children.forEach((tr) {
     final district = tr.children[0].text.replaceFirst(' District',  '').trim();
     if (tr.children.length == 2) {
@@ -63,9 +99,10 @@ List<List<String>> extractTownships(Element tbody) {
       final townships = rm.map((m) => m[1].trim()).toSet().toList()
         ..sort();
 
-      townships.forEach((tw) {
-        out.add([district, tw]);
-      });
+      if (townships.length > 0) {
+        out.putIfAbsent(district, () => <String>[]);
+        out[district].addAll(townships);
+      }
     }
   });
   return out;
