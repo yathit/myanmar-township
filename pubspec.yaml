@@ -1,0 +1,5 @@
+name: list-myanmar-township
+description: List townships in Myanmar by scrapping Wikipedia
+dependencies:
+  html: any
+  http: any
